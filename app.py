@@ -3,11 +3,13 @@ import datetime
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import bcrypt
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'seu_segredo_aqui'
+app.config['SECRET_KEY'] = '6D9AEC1F1F49661ADAD7571ADFAC9'
 db = SQLAlchemy(app)
 
 class User(db.Model):
@@ -64,10 +66,9 @@ def login():
     if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         return jsonify({'message': 'Senha incorreta'}), 401
 
-    # Gerar o token JWT
     token = jwt.encode({
         'user_id': user.id,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # Expira em 1 hora
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
     }, app.config['SECRET_KEY'], algorithm='HS256')
 
     return jsonify({'message': 'Login bem-sucedido', 'token': token}), 200
