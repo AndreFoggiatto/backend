@@ -16,9 +16,18 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-
+    
     def __repr__(self):
         return f'<User {self.username}>'
+    
+class SensorData(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ppfd = db.Column(db.Float, nullable=False)  # PPFD (Photosynthetic Photon Flux Density)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    def __repr__(self):
+        return f'<SensorData PPFD={self.ppfd}, Timestamp={self.timestamp}, UserID={self.user_id}>'
 
 with app.app_context():
     db.create_all()
@@ -66,12 +75,9 @@ def login():
     if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         return jsonify({'message': 'Senha incorreta'}), 401
 
-    token = jwt.encode({
-        'user_id': user.id,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
-    }, app.config['SECRET_KEY'], algorithm='HS256')
+    userId = user.id
 
-    return jsonify({'message': 'Login bem-sucedido', 'token': token}), 200
+    return jsonify({'message': 'Login bem-sucedido', 'user_id': userId}), 200
 
 # Rota para verificar se o usuário está autenticado
 @app.route('/protected', methods=['GET'])
@@ -100,6 +106,26 @@ def protected():
         return jsonify({'message': 'Token expirado'}), 401
     except jwt.InvalidTokenError:
         return jsonify({'message': 'Token inválido'}), 401
+
+# Endpoint para salvar dados de PPFD e Lux
+@app.route('/save_sensor_data', methods=['POST'])
+def save_sensor_data():
+    data = request.get_json()
+
+    ppfd = data.get('ppfd')
+    userId = data.get('user_id')
+
+    if not ppfd or not userId:
+        return jsonify({'message': 'Dados inválidos'}), 400
+
+    user = User.query.filter_by(id=userId).first()
+    if not user:
+        return jsonify({'message': 'Usuário não encontrado'}), 404
+    sensor_data = SensorData(ppfd=ppfd, user_id=userId)
+    db.session.add(sensor_data)
+    db.session.commit()
+
+    return jsonify({'message': 'Dados de sensor salvos com sucesso'}), 201
 
 if __name__ == '__main__':
     app.run(debug=True)
